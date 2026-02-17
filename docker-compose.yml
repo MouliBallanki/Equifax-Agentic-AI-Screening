@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: equifax-screening-db
+    environment:
+      POSTGRES_DB: tenant_screening
+      POSTGRES_USER: screening_user
+      POSTGRES_PASSWORD: screening_pass_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U screening_user -d tenant_screening"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - screening-network
+
+  # Redis for caching (optional, for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: equifax-screening-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - screening-network
+
+  # MCP Screening API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: equifax-screening-api
+    environment:
+      # API Configuration
+      LOG_LEVEL: INFO
+      
+      # Claude API (add your key)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-your_key_here}
+      
+      # Database
+      DATABASE_URL: postgresql://screening_user:screening_pass_local@postgres:5432/tenant_screening
+      
+      # Redis (for future caching)
+      REDIS_URL: redis://redis:6379/0
+      
+      # Application Settings
+      MAX_WORKERS: 4
+      RATE_LIMIT_PER_MINUTE: 100
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount code for development (remove for production)
+      - ./agents:/app/agents
+      - ./mcp_server:/app/mcp_server
+      - ./api:/app/api
+      - ./tools:/app/tools
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - screening-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  screening-network:
+    driver: bridge

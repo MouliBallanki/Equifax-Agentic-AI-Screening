@@ -1,0 +1,48 @@
+# Development-specific overrides
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use builder stage for dev tools
+    environment:
+      LOG_LEVEL: DEBUG
+      RELOAD: "true"
+    command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      # Mount entire codebase for hot reload
+      - .:/app
+      - /app/venv
+      - /app/__pycache__
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # For debugpy
+
+  # Development database with exposed port
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tenant_screening_dev
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: equifax-screening-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@equifax.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - screening-network
+    depends_on:
+      - postgres
+
+volumes:
+  pgadmin_data:
