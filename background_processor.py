@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from tools.database_tool import DatabaseTool
 from mcp_server.orchestrator import AgentOrchestrator
 from mcp_server.context_manager import ContextManager
+from utils.status_mapper import decision_to_status
 
 # Load environment variables
 load_dotenv()
@@ -241,7 +242,9 @@ class ApplicationProcessor:
         
         # Extract final decision
         final_decision = result.get('final_decision', {})
-        status = final_decision.get('decision', 'pending')
+        agent_decision = final_decision.get('decision', 'PENDING')
+        # Convert AI decision (APPROVE/DENY/CONDITIONAL_APPROVE) to DB status (APPROVED/REJECTED/PENDING)
+        status = decision_to_status(agent_decision)
         risk_score = final_decision.get('risk_score')
         decision_reason = final_decision.get('reason', 'Screening completed')
         

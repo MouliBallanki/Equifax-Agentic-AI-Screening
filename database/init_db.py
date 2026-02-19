@@ -38,7 +38,7 @@ def generate_ssn():
     return f"{random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(1000, 9999)}"
 
 
-def generate_applicant_data(status='pending', screening_completed=0):
+def generate_applicant_data(status='PENDING', screening_completed=0):
     """Generate a single applicant record."""
     
     application_id = str(uuid.uuid4())
@@ -128,19 +128,19 @@ def generate_applicant_data(status='pending', screening_completed=0):
     screened_at = None
     
     if screening_completed == 1:
-        if status == 'approved':
+        if status == 'APPROVED':
             risk_score = round(random.uniform(65, 95), 2)
             final_decision = {
-                "decision": "approved",
-                "recommendation": "approve",
+                "decision": "APPROVE",  # AI agent format (uppercase)
+                "recommendation": "APPROVE",  # AI agent format (uppercase)
                 "confidence": round(random.uniform(0.8, 0.95), 2)
             }
             decision_reason = "Applicant meets all criteria with good credit history and stable employment"
         else:  # rejected
             risk_score = round(random.uniform(20, 50), 2)
             final_decision = {
-                "decision": "rejected",
-                "recommendation": "reject",
+                "decision": "DENY",  # AI agent format (uppercase)
+                "recommendation": "DENY",  # AI agent format (uppercase)
                 "confidence": round(random.uniform(0.75, 0.9), 2)
             }
             decision_reason = random.choice([
@@ -396,15 +396,15 @@ def init_database(mode=None):
                 # Generate records
                 print(f"  - {approved_count} approved applications...")
                 for _ in range(approved_count):
-                    applicants.append(generate_applicant_data('approved', 1))
+                    applicants.append(generate_applicant_data('APPROVED', 1))
                 
                 print(f"  - {rejected_count} rejected applications...")
                 for _ in range(rejected_count):
-                    applicants.append(generate_applicant_data('rejected', 1))
+                    applicants.append(generate_applicant_data('REJECTED', 1))
                 
                 print(f"  - {pending_count} pending applications...")
                 for _ in range(pending_count):
-                    applicants.append(generate_applicant_data('pending', 0))
+                    applicants.append(generate_applicant_data('PENDING', 0))
                 
                 # Shuffle to mix statuses
                 random.shuffle(applicants)

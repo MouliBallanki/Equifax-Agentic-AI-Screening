@@ -69,7 +69,7 @@ def list_pending_applications(limit: int = 5) -> list:
     try:
         response = requests.get(
             f"{BASE_URL}/applications",
-            params={"status": "pending", "screening_completed": 0, "limit": limit}
+            params={"status": "PENDING", "screening_completed": 0, "limit": limit}
         )
         response.raise_for_status()
         data = response.json()

@@ -88,7 +88,7 @@ class DatabaseTool:
                 pets, smoker, bankruptcy_history, eviction_history, status,
                 screening_completed, application_data, created_at
             FROM applications
-            WHERE status = 'pending' AND screening_completed = 0
+            WHERE status = 'PENDING' AND screening_completed = 0
             ORDER BY created_at ASC
             LIMIT %s
         """
@@ -123,7 +123,7 @@ class DatabaseTool:
             async with conn.cursor() as cursor:
                 await cursor.execute(
                     query,
-                    (json.dumps(application_data), "pending")
+                    (json.dumps(application_data), "PENDING")
                 )
                 app_id = cursor.lastrowid
                 await conn.commit()

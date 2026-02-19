@@ -53,12 +53,12 @@ python submit_new_application.py --stats
 
 ```sql
 -- View pending
-SELECT * FROM equifax_screening.applications WHERE status = 'pending';
+SELECT * FROM equifax_screening.applications WHERE status = 'PENDING';
 
 -- Reset pending to unprocessed
 UPDATE equifax_screening.applications 
 SET screening_completed = 0 
-WHERE status = 'pending';
+WHERE status = 'PENDING';
 
 -- Get statistics
 SELECT status, screening_completed, COUNT(*) as count 

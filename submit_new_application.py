@@ -95,7 +95,7 @@ def submit_application(applicant_data):
         print(f"Created At: {result['created_at']}")
         
         print("\n💡 Next Steps:")
-        print("  1. Application is now in the database with status='pending'")
+        print("  1. Application is now in the database with status='PENDING'")
         print("  2. Background processor will automatically pick it up")
         print("  3. It will go through 8 AI agents for screening")
         print("  4. Final decision will be stored in database")

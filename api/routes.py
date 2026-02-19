@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from utils.status_mapper import decision_to_status
 
 from .schemas import (
     ApplicationSubmitRequest,
@@ -31,7 +32,7 @@ async def submit_application_to_database(
     Submit a new tenant application directly to database (Real-time flow).
     
     This is the endpoint a real applicant would use when filling out an online form.
-    The application is stored in the database with status='pending' and screening_completed=0.
+    The application is stored in the database with status='PENDING' and screening_completed=0.
     The background processor will automatically pick it up and process it.
     
     Args:
@@ -109,7 +110,7 @@ async def submit_application_to_database(
                     additional_info.get('smoker', False),
                     additional_info.get('bankruptcy_history', False),
                     additional_info.get('eviction_history', False),
-                    'pending',  # status
+                    'PENDING',  # status
                     0,  # screening_completed
                     json.dumps(application_data)  # application_data JSON
                 ))
@@ -120,7 +121,7 @@ async def submit_application_to_database(
         
         return ApplicationResponse(
             application_id=application_id,
-            status="pending",
+            status="PENDING",
             message="Application submitted successfully and queued for automatic screening",
             created_at=datetime.utcnow()
         )
@@ -169,7 +170,7 @@ async def submit_application(
         
         return ApplicationResponse(
             application_id=application_id,
-            status="pending",
+            status="PENDING",
             message="Application submitted successfully",
             created_at=datetime.utcnow()
         )
@@ -300,7 +301,7 @@ async def get_application(
         
         return {
             "application_id": application_id,
-            "status": context.get("status", "pending"),
+            "status": context.get("status", "PENDING"),
             "data": context,
             "retrieved_at": datetime.utcnow().isoformat()
         }
@@ -351,7 +352,7 @@ async def get_screening_results(
         
         return {
             "application_id": application_id,
-            "screening_status": context.get("status", "pending"),
+            "screening_status": context.get("status", "PENDING"),
             "agent_results": agent_results,
             "final_decision": context.get("final_decision"),
             "retrieved_at": datetime.utcnow().isoformat()
@@ -526,7 +527,9 @@ async def process_pending_applications(
                 
                 # Extract final decision
                 final_decision = result.get('final_decision', {})
-                status = final_decision.get('decision', 'pending')
+                agent_decision = final_decision.get('decision', 'PENDING')
+                # Convert AI decision (APPROVE/DENY/CONDITIONAL_APPROVE) to DB status (APPROVED/REJECTED/PENDING)
+                status = decision_to_status(agent_decision)
                 risk_score = final_decision.get('risk_score')
                 decision_reason = final_decision.get('reason', 'Screening completed')
                 
@@ -619,7 +622,7 @@ async def list_applications(
     
     Args:
         req: FastAPI request
-        status: Filter by status (pending, approved, rejected, processing)
+        status: Filter by status (PENDING, APPROVED, REJECTED, PROCESSING)
         screening_completed: Filter by screening completion (0 or 1)
         limit: Maximum number of results
     
