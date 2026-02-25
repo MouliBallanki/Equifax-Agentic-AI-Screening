@@ -6,8 +6,16 @@ Minimal test to verify system is working without needing API keys.
 
 import asyncio
 import sys
+import os
 from pathlib import Path
 from datetime import datetime
+
+# Fix Windows console encoding for emojis
+if sys.platform == "win32":
+    os.system("chcp 65001 > nul 2>&1")
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -116,12 +124,12 @@ async def quick_test():
     print("=" * 70)
     
     print("\n📋 Next Steps:")
-    print("   1. Set ANTHROPIC_API_KEY in .env file")
+    print("   1. (Optional) Configure GCP Vertex AI - see GCP_VERTEX_AI_SETUP.md")
     print("   2. Run full test: python test_full_system.py")
     print("   3. Start API server: python -m api.main")
     print("   4. Try endpoints: http://localhost:8000/docs")
     
-    print("\n💡 Tip: Without API key, agents will use mock responses")
+    print("\n💡 Tip: Without Vertex AI, agents use mock responses")
     print("   This is fine for testing the orchestration flow!\n")
     
     return True

@@ -6,6 +6,7 @@ Foundation class for all AI-powered agents using Claude/GPT-4.
 
 import os
 import logging
+import json
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -16,6 +17,15 @@ try:
 except ImportError:
     HAS_ANTHROPIC = False
     logging.warning("Anthropic SDK not available")
+
+try:
+    from google.auth import default
+    from google.oauth2 import service_account
+    from anthropic import AnthropicVertex
+    HAS_VERTEX = True
+except ImportError:
+    HAS_VERTEX = False
+    logging.warning("GCP Vertex AI SDK not available")
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +63,20 @@ class BaseAIAgent(ABC):
         self.temperature = temperature
         self.logger = logging.getLogger(f"agents.{agent_name}")
         
-        # Initialize Claude client
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if HAS_ANTHROPIC and api_key:
-            self.claude_client = AsyncAnthropic(api_key=api_key)
+        # Initialize Claude client (Vertex AI only, fallback to mock)
+        self.claude_client = None
+        self.has_claude = False
+        self.llm_provider = "none"
+        
+        # Try GCP Vertex AI (with service account)
+        if HAS_VERTEX and self._init_vertex_ai():
             self.has_claude = True
+            self.llm_provider = "vertex-ai"
+            self.logger.info(f"{agent_name}: Using GCP Vertex AI Claude")
         else:
-            self.claude_client = None
-            self.has_claude = False
-            self.logger.warning(f"{agent_name}: Claude API not available")
+            # Fallback to mock responses (no Anthropic API)
+            self.logger.warning(f"{agent_name}: No Vertex AI configured, using mock responses")
+            self.logger.info(f"To enable GCP Vertex AI, set: GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_JSON")
     
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -127,6 +142,61 @@ class BaseAIAgent(ABC):
         """
         pass
     
+    def _init_vertex_ai(self) -> bool:
+        """
+        Initialize GCP Vertex AI with service account.
+        
+        Environment variables:
+            GCP_PROJECT_ID: GCP project ID
+            GCP_REGION: GCP region (default: us-central1)
+            GCP_SERVICE_ACCOUNT_JSON: Path to service account JSON file
+            GOOGLE_APPLICATION_CREDENTIALS: Alternative path to service account JSON
+            
+        Returns:
+            True if successfully initialized
+        """
+        try:
+            project_id = os.getenv("GCP_PROJECT_ID")
+            region = os.getenv("GCP_REGION", "us-central1")
+            
+            if not project_id:
+                return False
+            
+            # Load service account credentials
+            sa_json_path = os.getenv("GCP_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            
+            if sa_json_path and os.path.exists(sa_json_path):
+                credentials = service_account.Credentials.from_service_account_file(
+                    sa_json_path,
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                )
+                self.logger.info(f"Loaded service account from {sa_json_path}")
+            else:
+                # Use default credentials (if running on GCP)
+                credentials, _ = default()
+                self.logger.info("Using default GCP credentials")
+            
+            # Initialize Vertex AI Anthropic client
+            self.claude_client = AnthropicVertex(
+                project_id=project_id,
+                region=region,
+                credentials=credentials
+            )
+            
+            # Map model names for Vertex AI
+            if "claude-sonnet-4" in self.model or "sonnet-4" in self.model:
+                self.model = "claude-3-5-sonnet-v2@20241022"
+            elif "opus" in self.model:
+                self.model = "claude-3-opus@20240229"
+            elif "haiku" in self.model:
+                self.model = "claude-3-5-haiku@20241022"
+            
+            return True
+            
+        except Exception as e:
+            self.logger.debug(f"Vertex AI initialization failed: {e}")
+            return False
+    
     def _validate_input(self, input_data: Dict[str, Any]) -> None:
         """
         Validate input data.
@@ -179,7 +249,7 @@ class BaseAIAgent(ABC):
             text_content = response.content[0].text
             
             self.logger.info(
-                f"{self.agent_name}: Claude call successful "
+                f"{self.agent_name}: Claude call successful via {self.llm_provider} "
                 f"(input_tokens={response.usage.input_tokens}, "
                 f"output_tokens={response.usage.output_tokens})"
             )
