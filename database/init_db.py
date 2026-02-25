@@ -26,6 +26,9 @@ DB_CONFIG = {
     'charset': 'utf8mb4'
 }
 
+# Dummy user ID used for all seed data
+DUMMY_USER_ID = "00000000-0000-0000-0000-000000000001"
+
 # Employment statuses
 EMPLOYMENT_STATUSES = ['full-time', 'part-time', 'self-employed', 'contract']
 
@@ -156,6 +159,7 @@ def generate_applicant_data(status='PENDING', screening_completed=0):
     
     return {
         'application_id': application_id,
+        'user_id': DUMMY_USER_ID,
         'first_name': first_name,
         'last_name': last_name,
         'email': email,
@@ -383,6 +387,20 @@ def init_database(mode=None):
         # Insert data if needed
         if should_insert:
             with connection.cursor() as cursor:
+                # Ensure dummy user exists for seed data
+                cursor.execute("SELECT user_id FROM users WHERE user_id = %s", (DUMMY_USER_ID,))
+                if not cursor.fetchone():
+                    import hashlib, os as _os
+                    _salt = _os.urandom(16)
+                    _dk = hashlib.pbkdf2_hmac("sha256", b"Test@123", _salt, 100_000)
+                    _pw_hash = _salt.hex() + ":" + _dk.hex()
+                    cursor.execute(
+                        "INSERT INTO users (user_id, first_name, email, password_hash) VALUES (%s, %s, %s, %s)",
+                        (DUMMY_USER_ID, "Demo", "demo@equifax.com", _pw_hash)
+                    )
+                    connection.commit()
+                    print("✓ Created dummy user (demo@equifax.com / Test@123)")
+
                 # Generate applicants
                 print(f"\n👥 Generating {insert_count} applicant records...")
                 
@@ -414,14 +432,14 @@ def init_database(mode=None):
                 
                 insert_query = """
                     INSERT INTO applications (
-                        application_id, first_name, last_name, email, phone, ssn, date_of_birth,
+                        application_id, user_id, first_name, last_name, email, phone, ssn, date_of_birth,
                         street, city, state, zip, employer_name, job_title, employment_status,
                         annual_income, years_employed, employer_phone, current_landlord,
                         current_landlord_phone, monthly_rent, years_at_current, reason_for_leaving,
                         pets, smoker, bankruptcy_history, eviction_history, status, screening_completed,
                         application_data, final_decision, decision_reason, risk_score, created_at, screened_at
                     ) VALUES (
-                        %(application_id)s, %(first_name)s, %(last_name)s, %(email)s, %(phone)s,
+                        %(application_id)s, %(user_id)s, %(first_name)s, %(last_name)s, %(email)s, %(phone)s,
                         %(ssn)s, %(date_of_birth)s, %(street)s, %(city)s, %(state)s, %(zip)s,
                         %(employer_name)s, %(job_title)s, %(employment_status)s, %(annual_income)s,
                         %(years_employed)s, %(employer_phone)s, %(current_landlord)s,

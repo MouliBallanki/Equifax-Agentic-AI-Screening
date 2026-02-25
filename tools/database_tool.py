@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional
 import aiomysql
 import json
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class DatabaseTool:
             'host': parsed.hostname or 'localhost',
             'port': parsed.port or 3306,
             'user': parsed.username or 'root',
-            'password': parsed.password or '',
+            'password': unquote(parsed.password) if parsed.password else '',
             'db': parsed.path.lstrip('/') if parsed.path else 'equifax_screening',
             'charset': 'utf8mb4',
             'autocommit': False

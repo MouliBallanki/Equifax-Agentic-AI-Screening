@@ -7,7 +7,7 @@ Endpoints for tenant screening operations.
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks, Header
 from utils.status_mapper import decision_to_status
 
 from .schemas import (
@@ -26,7 +26,8 @@ router = APIRouter(tags=["Tenant Screening"])
 @router.post("/applications/submit-to-db", response_model=ApplicationResponse)
 async def submit_application_to_database(
     request: ApplicationSubmitRequest,
-    req: Request
+    req: Request,
+    authorization: Optional[str] = Header(None)
 ) -> ApplicationResponse:
     """
     Submit a new tenant application directly to database (Real-time flow).
@@ -51,6 +52,16 @@ async def submit_application_to_database(
     try:
         import uuid
         
+        # Extract user_id from JWT token if present
+        user_id = None
+        if authorization and authorization.startswith("Bearer "):
+            try:
+                from .auth_routes import decode_token
+                payload = decode_token(authorization[7:])
+                user_id = payload.get("sub")
+            except Exception:
+                pass
+        
         # Generate application ID
         application_id = str(uuid.uuid4())
         
@@ -70,14 +81,14 @@ async def submit_application_to_database(
         # Insert into database
         query = """
             INSERT INTO applications (
-                application_id, first_name, last_name, email, phone, ssn, date_of_birth,
+                application_id, user_id, first_name, last_name, email, phone, ssn, date_of_birth,
                 street, city, state, zip, employer_name, job_title, employment_status,
                 annual_income, years_employed, employer_phone, current_landlord,
                 current_landlord_phone, monthly_rent, years_at_current, reason_for_leaving,
                 pets, smoker, bankruptcy_history, eviction_history, status, screening_completed,
                 application_data
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
         """
         
@@ -85,6 +96,7 @@ async def submit_application_to_database(
             async with conn.cursor() as cursor:
                 await cursor.execute(query, (
                     application_id,
+                    user_id,
                     applicant.get('first_name'),
                     applicant.get('last_name'),
                     applicant.get('email'),
@@ -178,6 +190,52 @@ async def submit_application(
     except Exception as e:
         logger.error(f"Application submission error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/applications/my")
+async def get_my_applications(
+    req: Request,
+    authorization: Optional[str] = Header(None),
+    limit: int = 50
+) -> Dict[str, Any]:
+    """
+    Get applications belonging to the authenticated user.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    from .auth_routes import decode_token
+    payload = decode_token(authorization[7:])
+    user_id = payload["sub"]
+
+    from tools.database_tool import DatabaseTool
+    import os
+
+    database_url = os.getenv('DATABASE_URL', 'mysql://root:password@localhost:3306/equifax_screening')
+    db_tool = DatabaseTool(database_url)
+
+    try:
+        await db_tool.connect()
+        async with db_tool.pool.acquire() as conn:
+            import aiomysql
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    """
+                    SELECT application_id, first_name, last_name, email, status,
+                           screening_completed, risk_score, final_decision,
+                           decision_reason, created_at, screened_at
+                    FROM applications
+                    WHERE user_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (user_id, limit),
+                )
+                applications = await cursor.fetchall()
+
+        return {"count": len(applications), "applications": applications}
+    finally:
+        await db_tool.disconnect()
 
 
 @router.post("/applications/{application_id}/screen", response_model=ScreeningResponse)

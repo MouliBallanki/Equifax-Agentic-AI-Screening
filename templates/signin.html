@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Equifax AI Tenant Screening</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;min-height:100vh;display:flex;flex-direction:column}
+        .header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:#fff;padding:24px 40px;display:flex;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+        .header-left{display:flex;align-items:center;gap:16px}
+        .logo-icon{width:48px;height:48px;background:linear-gradient(135deg,#e94560,#c23152);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+        .header h1{font-size:22px;font-weight:600;letter-spacing:.5px}
+        .header p{font-size:13px;opacity:.75;margin-top:2px}
+
+        .page-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+        .auth-card{background:#fff;border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,.08);width:100%;max-width:460px;padding:44px 40px}
+        .auth-card h2{font-size:26px;font-weight:700;color:#1a1a2e;margin-bottom:6px}
+        .auth-card .subtitle{font-size:14px;color:#888;margin-bottom:32px}
+
+        .form-group{margin-bottom:20px}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;letter-spacing:.3px}
+        .form-group label .req{color:#e94560;margin-left:2px}
+        .form-group input{width:100%;padding:12px 14px;border:2px solid #e8e8e8;border-radius:10px;font-size:14px;font-family:inherit;color:#333;transition:all .2s;background:#fafafa}
+        .form-group input:focus{outline:none;border-color:#e94560;background:#fff;box-shadow:0 0 0 4px rgba(233,69,96,.08)}
+        .form-group input::placeholder{color:#bbb}
+        .form-group input.error{border-color:#e74c3c;background:#fff5f5}
+        .form-group .error-msg{color:#e74c3c;font-size:12px;margin-top:4px;display:none}
+        .form-group input.error~.error-msg{display:block}
+
+        .btn-submit{width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#e94560,#c23152);color:#fff;box-shadow:0 4px 15px rgba(233,69,96,.3);transition:all .2s;margin-top:8px}
+        .btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(233,69,96,.4)}
+        .btn-submit:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+
+        .alt-link{text-align:center;margin-top:24px;font-size:14px;color:#888}
+        .alt-link a{color:#e94560;text-decoration:none;font-weight:600}
+        .alt-link a:hover{text-decoration:underline}
+
+        .alert{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:20px;display:none}
+        .alert.error{background:#fff5f5;border:1px solid #f5c6cb;color:#e74c3c;display:block}
+
+        .spinner{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        @media(max-width:640px){.header{padding:16px 20px}.header h1{font-size:18px}.auth-card{padding:32px 24px}}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="logo-icon">E</div>
+        <div>
+            <h1>Equifax AI Tenant Screening</h1>
+            <p>AI-Powered Screening Platform</p>
+        </div>
+    </div>
+</div>
+
+<div class="page-wrap">
+    <div class="auth-card">
+        <h2>Welcome Back</h2>
+        <p class="subtitle">Sign in to your account</p>
+
+        <div class="alert" id="alert"></div>
+
+        <form id="signinForm" onsubmit="return handleSignin(event)">
+            <div class="form-group">
+                <label>Email Address <span class="req">*</span></label>
+                <input type="email" id="email" placeholder="john@email.com" required>
+                <div class="error-msg">Email is required</div>
+            </div>
+
+            <div class="form-group">
+                <label>Password <span class="req">*</span></label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+                <div class="error-msg">Password is required</div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
+        </form>
+
+        <div class="alt-link">Don't have an account? <a href="/signup">Sign Up</a></div>
+    </div>
+</div>
+
+<script>
+    if (localStorage.getItem('token')) location.href = '/';
+
+    document.querySelectorAll('input').forEach(el => {
+        el.addEventListener('input', () => el.classList.remove('error'));
+    });
+
+    async function handleSignin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        const alertEl = document.getElementById('alert');
+        alertEl.className = 'alert';
+        alertEl.style.display = 'none';
+
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        let valid = true;
+        if (!email)    { document.getElementById('email').classList.add('error'); valid = false; }
+        if (!password) { document.getElementById('password').classList.add('error'); valid = false; }
+        if (!valid) return false;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Signing In...';
+
+        try {
+            const res = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('first_name', data.first_name);
+                localStorage.setItem('email', data.email);
+                localStorage.setItem('user_id', data.user_id);
+                location.href = '/';
+            } else {
+                alertEl.className = 'alert error';
+                alertEl.textContent = data.detail || 'Invalid email or password.';
+                alertEl.style.display = 'block';
+            }
+        } catch (err) {
+            alertEl.className = 'alert error';
+            alertEl.textContent = 'Network error. Please check if the server is running.';
+            alertEl.style.display = 'block';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+        return false;
+    }
+</script>
+
+</body>
+</html>

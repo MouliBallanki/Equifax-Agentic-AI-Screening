@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Equifax AI Tenant Screening</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+
+        /* ===== Header ===== */
+        .header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:#fff;padding:16px 40px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+        .header-left{display:flex;align-items:center;gap:16px}
+        .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,#e94560,#c23152);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;cursor:pointer}
+        .header h1{font-size:20px;font-weight:600;letter-spacing:.5px}
+        .header p{font-size:12px;opacity:.7;margin-top:1px}
+        .header-right{display:flex;align-items:center;gap:20px}
+        .user-greeting{font-size:14px;font-weight:500;color:rgba(255,255,255,.85)}
+        .user-greeting strong{color:#ff6b8a}
+        .header-btn{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+        .btn-apps{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2)}
+        .btn-apps:hover{background:rgba(255,255,255,.2)}
+        .btn-apps.active{background:rgba(233,69,96,.3);border-color:#e94560}
+        .btn-logout{background:rgba(233,69,96,.2);color:#ff6b8a;border:1px solid rgba(233,69,96,.3)}
+        .btn-logout:hover{background:rgba(233,69,96,.35)}
+
+        /* ===== Container ===== */
+        .container{max-width:1100px;margin:0 auto;padding:32px 24px 48px}
+
+        /* ===== Welcome Banner ===== */
+        .welcome-banner{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:20px;padding:40px 44px;color:#fff;margin-bottom:36px;position:relative;overflow:hidden}
+        .welcome-banner::after{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:rgba(233,69,96,.1);border-radius:50%}
+        .welcome-banner h2{font-size:28px;font-weight:700;margin-bottom:8px;position:relative;z-index:1}
+        .welcome-banner p{font-size:15px;opacity:.8;margin-bottom:24px;position:relative;z-index:1}
+        .btn-new-app{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:linear-gradient(135deg,#e94560,#c23152);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 4px 15px rgba(233,69,96,.4);transition:all .2s;position:relative;z-index:1;text-decoration:none}
+        .btn-new-app:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(233,69,96,.5)}
+
+        /* ===== Section Title ===== */
+        .section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+        .section-title h3{font-size:20px;font-weight:700;color:#1a1a2e}
+        .section-title .count-badge{background:#eef2ff;color:#5b6abf;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600}
+
+        /* ===== Application Grid ===== */
+        .app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+        .app-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.05);border:2px solid transparent;transition:all .25s;cursor:pointer;position:relative}
+        .app-card:hover{border-color:#e94560;box-shadow:0 8px 25px rgba(233,69,96,.1);transform:translateY(-2px)}
+        .app-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+        .app-card-name{font-size:17px;font-weight:600;color:#1a1a2e}
+        .app-card-email{font-size:13px;color:#888;margin-top:2px}
+        .status-badge{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+        .status-pending{background:#fff8e1;color:#f5a623;border:1px solid #ffe0b2}
+        .status-approved{background:#e8f8f0;color:#27ae60;border:1px solid #b7ebd0}
+        .status-rejected{background:#fff0f0;color:#e74c3c;border:1px solid #f5c6cb}
+        .status-processing{background:#eef2ff;color:#5b6abf;border:1px solid #c8d6f0}
+        .status-error{background:#fff0f0;color:#e74c3c;border:1px solid #f5c6cb}
+
+        .app-card-details{display:flex;gap:24px;font-size:13px;color:#777;margin-top:8px}
+        .app-card-details span{display:flex;align-items:center;gap:4px}
+        .app-card-score{font-weight:600;color:#1a1a2e}
+
+        /* ===== Empty State ===== */
+        .empty-state{text-align:center;padding:60px 20px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.05)}
+        .empty-state .icon{font-size:56px;margin-bottom:16px;opacity:.5}
+        .empty-state h4{font-size:18px;color:#555;margin-bottom:8px}
+        .empty-state p{font-size:14px;color:#999}
+
+        /* ===== Detail Modal ===== */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.show{display:flex}
+        .detail-modal{background:#fff;border-radius:20px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto;padding:36px;animation:modalIn .3s ease}
+        @keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+        .detail-modal h3{font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+        .detail-modal .detail-subtitle{font-size:13px;color:#888;margin-bottom:24px}
+        .detail-section{margin-bottom:20px}
+        .detail-section h4{font-size:14px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #f0f2f5}
+        .detail-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+        .detail-row .label{color:#888;font-weight:500}
+        .detail-row .value{color:#333;font-weight:600;text-align:right;max-width:60%}
+        .detail-close{width:100%;margin-top:20px;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;background:#f0f2f5;color:#666;transition:all .2s}
+        .detail-close:hover{background:#e0e3e8}
+
+        .loading{text-align:center;padding:60px;font-size:15px;color:#888}
+
+        @media(max-width:640px){
+            .header{padding:14px 16px;flex-wrap:wrap;gap:12px}
+            .header h1{font-size:17px}
+            .header-right{gap:10px}
+            .header-btn{padding:6px 12px;font-size:12px}
+            .welcome-banner{padding:28px 24px}
+            .welcome-banner h2{font-size:22px}
+            .app-grid{grid-template-columns:1fr}
+            .container{padding:20px 12px 36px}
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="logo-icon" onclick="location.href='/'">E</div>
+        <div>
+            <h1>Equifax AI Tenant Screening</h1>
+            <p>AI-Powered Screening Platform</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <span class="user-greeting">Hi, <strong id="headerName"></strong></span>
+        <button class="header-btn btn-apps active" onclick="scrollToApps()">My Applications</button>
+        <button class="header-btn btn-logout" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="welcome-banner">
+        <h2 id="welcomeMsg">Welcome back!</h2>
+        <p>Submit a new application or review your existing ones below.</p>
+        <a href="/apply" class="btn-new-app">+ New Application</a>
+    </div>
+
+    <div class="section-title">
+        <h3>My Applications</h3>
+        <span class="count-badge" id="appCount">0 applications</span>
+    </div>
+
+    <div id="appContainer">
+        <div class="loading" id="loadingState">Loading your applications...</div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+    <div class="detail-modal" id="detailContent"></div>
+</div>
+
+<script>
+    const token = localStorage.getItem('token');
+    const firstName = localStorage.getItem('first_name');
+    if (!token) { location.href = '/signin'; }
+
+    document.getElementById('headerName').textContent = firstName || 'User';
+    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + (firstName || 'User') + '!';
+
+    function logout() {
+        localStorage.clear();
+        location.href = '/signin';
+    }
+
+    function scrollToApps() {
+        document.getElementById('appContainer').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function statusClass(s) {
+        if (!s) return 'status-pending';
+        const sl = s.toLowerCase();
+        if (sl === 'approved') return 'status-approved';
+        if (sl === 'rejected') return 'status-rejected';
+        if (sl === 'processing') return 'status-processing';
+        if (sl === 'error') return 'status-error';
+        return 'status-pending';
+    }
+
+    function fmtDate(d) {
+        if (!d) return '-';
+        const dt = new Date(d);
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    async function loadApplications() {
+        try {
+            const res = await fetch('/api/v1/applications/my', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.status === 401) { logout(); return; }
+            const data = await res.json();
+            renderApplications(data.applications || []);
+        } catch (err) {
+            document.getElementById('appContainer').innerHTML =
+                '<div class="empty-state"><div class="icon">&#9888;</div><h4>Could not load applications</h4><p>Please check if the server is running.</p></div>';
+        }
+    }
+
+    function renderApplications(apps) {
+        const container = document.getElementById('appContainer');
+        document.getElementById('appCount').textContent = apps.length + ' application' + (apps.length !== 1 ? 's' : '');
+
+        if (apps.length === 0) {
+            container.innerHTML =
+                '<div class="empty-state"><div class="icon">&#128203;</div><h4>No applications yet</h4><p>Click "New Application" to submit your first tenant screening application.</p></div>';
+            return;
+        }
+
+        let html = '<div class="app-grid">';
+        apps.forEach(app => {
+            const name = (app.first_name || '') + ' ' + (app.last_name || '');
+            const scoreText = app.risk_score != null ? app.risk_score.toFixed(1) : '-';
+            html += '<div class="app-card" onclick=\'showDetail(' + JSON.stringify(JSON.stringify(app)) + ')\'>'
+                + '<div class="app-card-header">'
+                + '  <div><div class="app-card-name">' + escHtml(name) + '</div>'
+                + '  <div class="app-card-email">' + escHtml(app.email || '') + '</div></div>'
+                + '  <span class="status-badge ' + statusClass(app.status) + '">' + escHtml(app.status || 'PENDING') + '</span>'
+                + '</div>'
+                + '<div class="app-card-details">'
+                + '  <span>Submitted: ' + fmtDate(app.created_at) + '</span>'
+                + '  <span>Score: <span class="app-card-score">' + scoreText + '</span></span>'
+                + '</div></div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function showDetail(jsonStr) {
+        const app = JSON.parse(jsonStr);
+        const name = (app.first_name || '') + ' ' + (app.last_name || '');
+        const scoreText = app.risk_score != null ? app.risk_score.toFixed(1) : 'Not scored';
+
+        let decisionHtml = '';
+        if (app.final_decision) {
+            let fd = app.final_decision;
+            if (typeof fd === 'string') { try { fd = JSON.parse(fd); } catch(e) {} }
+            if (typeof fd === 'object' && fd) {
+                decisionHtml = '<div class="detail-section"><h4>Decision Details</h4>';
+                Object.keys(fd).forEach(k => {
+                    decisionHtml += '<div class="detail-row"><span class="label">' + escHtml(k) + '</span><span class="value">' + escHtml(String(fd[k])) + '</span></div>';
+                });
+                decisionHtml += '</div>';
+            }
+        }
+
+        const html = ''
+            + '<h3>' + escHtml(name) + '</h3>'
+            + '<div class="detail-subtitle">Application ID: ' + escHtml(app.application_id || '') + '</div>'
+            + '<div class="detail-section"><h4>Status</h4>'
+            + '  <div class="detail-row"><span class="label">Status</span><span class="value"><span class="status-badge ' + statusClass(app.status) + '">' + escHtml(app.status || 'PENDING') + '</span></span></div>'
+            + '  <div class="detail-row"><span class="label">Risk Score</span><span class="value">' + escHtml(scoreText) + '</span></div>'
+            + '  <div class="detail-row"><span class="label">Submitted</span><span class="value">' + fmtDate(app.created_at) + '</span></div>'
+            + '  <div class="detail-row"><span class="label">Screened</span><span class="value">' + fmtDate(app.screened_at) + '</span></div>'
+            + '</div>'
+            + (app.decision_reason ? '<div class="detail-section"><h4>Decision Reason</h4><div class="detail-row"><span class="value" style="max-width:100%;text-align:left">' + escHtml(app.decision_reason) + '</span></div></div>' : '')
+            + decisionHtml
+            + '<button class="detail-close" onclick="closeDetail()">Close</button>';
+
+        document.getElementById('detailContent').innerHTML = html;
+        document.getElementById('detailModal').classList.add('show');
+    }
+
+    function closeDetail() {
+        document.getElementById('detailModal').classList.remove('show');
+    }
+
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetail();
+    });
+
+    loadApplications();
+</script>
+
+</body>
+</html>
