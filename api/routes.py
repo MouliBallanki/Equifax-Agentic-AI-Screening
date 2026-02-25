@@ -70,6 +70,20 @@ async def submit_application_to_database(
         db_tool = DatabaseTool(database_url)
         await db_tool.connect()
         
+        # Enforce one application per user
+        if user_id:
+            async with db_tool.pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(
+                        "SELECT COUNT(*) FROM applications WHERE user_id = %s", (user_id,)
+                    )
+                    (count,) = await cursor.fetchone()
+                    if count > 0:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="You have already submitted an application. Only one application per user is allowed."
+                        )
+        
         # Extract data from request
         application_data = request.model_dump()
         applicant = application_data.get('applicant', {})

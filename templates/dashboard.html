@@ -114,8 +114,8 @@
 
     <div class="welcome-banner">
         <h2 id="welcomeMsg">Welcome back!</h2>
-        <p>Submit a new application or review your existing ones below.</p>
-        <a href="/apply" class="btn-new-app">+ New Application</a>
+        <p id="welcomeSub">Submit your tenant screening application to get started.</p>
+        <a href="/apply" class="btn-new-app" id="newAppBtn">+ New Application</a>
     </div>
 
     <div class="section-title">
@@ -183,6 +183,11 @@
     function renderApplications(apps) {
         const container = document.getElementById('appContainer');
         document.getElementById('appCount').textContent = apps.length + ' application' + (apps.length !== 1 ? 's' : '');
+
+        if (apps.length > 0) {
+            document.getElementById('newAppBtn').style.display = 'none';
+            document.getElementById('welcomeSub').textContent = 'You have already submitted an application. Review its status below.';
+        }
 
         if (apps.length === 0) {
             container.innerHTML =

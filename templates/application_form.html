@@ -547,6 +547,21 @@
     if (!_token) location.href = '/signin';
     document.getElementById('headerName').textContent = localStorage.getItem('first_name') || 'User';
 
+    /* ---- One-application guard ---- */
+    (async function checkExisting() {
+        try {
+            const res = await fetch('/api/v1/applications/my', {
+                headers: { 'Authorization': 'Bearer ' + _token }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.applications && data.applications.length > 0) {
+                    location.href = '/';
+                }
+            }
+        } catch (e) {}
+    })();
+
     /* ---- Pre-fill email from account ---- */
     const _savedEmail = localStorage.getItem('email');
     if (_savedEmail) document.getElementById('email').value = _savedEmail;
