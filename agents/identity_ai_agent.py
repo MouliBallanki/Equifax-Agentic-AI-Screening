@@ -23,7 +23,7 @@ class IdentityAIAgent(BaseAIAgent):
         """Initialize IdentityAIAgent."""
         super().__init__(
             agent_name="IdentityAIAgent",
-            model="claude-sonnet-4.5-20250514",
+            model="gemini-2.5-flash",
             max_tokens=2500,
             temperature=0.2  # Low temperature for consistent verification
         )

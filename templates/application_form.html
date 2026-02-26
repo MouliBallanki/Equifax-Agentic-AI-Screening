@@ -561,10 +561,41 @@
             }
         } catch (e) {}
     })();
-
-    /* ---- Pre-fill email from account ---- */
-    const _savedEmail = localStorage.getItem('email');
-    if (_savedEmail) document.getElementById('email').value = _savedEmail;
+    
+    /* ---- Pre-fill user info from localStorage or API ---- */
+    (async function prefillUserInfo() {
+        // Try to get from localStorage first
+        let firstName = localStorage.getItem('first_name');
+        let lastName = localStorage.getItem('last_name');
+        let email = localStorage.getItem('email');
+        
+        // If last_name is missing (old session), fetch from API
+        if (!lastName && _token) {
+            try {
+                const res = await fetch('/api/v1/auth/me', {
+                    headers: { 'Authorization': 'Bearer ' + _token }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    firstName = data.first_name;
+                    lastName = data.last_name;
+                    email = data.email;
+                    
+                    // Update localStorage
+                    localStorage.setItem('first_name', firstName);
+                    localStorage.setItem('last_name', lastName);
+                    localStorage.setItem('email', email);
+                }
+            } catch (e) {
+                console.error('Failed to fetch user info:', e);
+            }
+        }
+        
+        // Pre-fill the form fields
+        if (firstName) document.getElementById('first_name').value = firstName;
+        if (lastName) document.getElementById('last_name').value = lastName;
+        if (email) document.getElementById('email').value = email;
+    })();
 
     let currentStep = 0;
     const totalSteps = 4;

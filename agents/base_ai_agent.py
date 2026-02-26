@@ -1,7 +1,7 @@
 """
 Base AI Agent.
 
-Foundation class for all AI-powered agents using Claude/GPT-4.
+Foundation class for all AI-powered agents using Gemini 2.0 Flash.
 """
 
 import os
@@ -12,20 +12,13 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 try:
-    from anthropic import AsyncAnthropic
-    HAS_ANTHROPIC = True
-except ImportError:
-    HAS_ANTHROPIC = False
-    logging.warning("Anthropic SDK not available")
-
-try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel, GenerationConfig
     from google.auth import default
-    from google.oauth2 import service_account
-    from anthropic import AnthropicVertex
     HAS_VERTEX = True
 except ImportError:
     HAS_VERTEX = False
-    logging.warning("GCP Vertex AI SDK not available")
+    logging.warning("GCP Vertex AI SDK not available - install: pip install google-cloud-aiplatform")
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +28,7 @@ class BaseAIAgent(ABC):
     Base class for all AI agents.
     
     Provides common functionality:
-    - Claude API integration
+    - Gemini 2.0 Flash API integration
     - Logging and error handling
     - Input/output standardization
     - Performance metrics
@@ -44,8 +37,8 @@ class BaseAIAgent(ABC):
     def __init__(
         self,
         agent_name: str,
-        model: str = "claude-sonnet-4.5-20250514",
-        max_tokens: int = 4000,
+        model: str = "gemini-2.5-flash",
+        max_tokens: int = 8000,
         temperature: float = 0.7
     ):
         """
@@ -53,9 +46,9 @@ class BaseAIAgent(ABC):
         
         Args:
             agent_name: Unique agent identifier
-            model: Claude model to use
+            model: Gemini model to use (gemini-2.5-flash, gemini-1.5-flash, gemini-1.5-pro)
             max_tokens: Maximum tokens for response
-            temperature: Model temperature (0-1)
+            temperature: Model temperature (0-2 for Gemini)
         """
         self.agent_name = agent_name
         self.model = model
@@ -63,20 +56,20 @@ class BaseAIAgent(ABC):
         self.temperature = temperature
         self.logger = logging.getLogger(f"agents.{agent_name}")
         
-        # Initialize Claude client (Vertex AI only, fallback to mock)
-        self.claude_client = None
-        self.has_claude = False
+        # Initialize Gemini client (Vertex AI)
+        self.gemini_model = None
+        self.has_llm = False
         self.llm_provider = "none"
         
-        # Try GCP Vertex AI (with service account)
+        # Try GCP Vertex AI with Application Default Credentials (gcloud auth login)
         if HAS_VERTEX and self._init_vertex_ai():
-            self.has_claude = True
-            self.llm_provider = "vertex-ai"
-            self.logger.info(f"{agent_name}: Using GCP Vertex AI Claude")
+            self.has_llm = True
+            self.llm_provider = "vertex-ai-gemini"
+            self.logger.info(f"{agent_name}: Using GCP Vertex AI Gemini {self.model}")
         else:
-            # Fallback to mock responses (no Anthropic API)
+            # Fallback to mock responses
             self.logger.warning(f"{agent_name}: No Vertex AI configured, using mock responses")
-            self.logger.info(f"To enable GCP Vertex AI, set: GCP_PROJECT_ID, GCP_SERVICE_ACCOUNT_JSON")
+            self.logger.info(f"To enable GCP Vertex AI: 1) Run 'gcloud auth login' 2) Set GCP_PROJECT_ID env var")
     
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -110,7 +103,7 @@ class BaseAIAgent(ABC):
                 "data": result,
                 "metadata": {
                     "execution_time_ms": execution_time_ms,
-                    "model_used": self.model if self.has_claude else "fallback",
+                    "model_used": self.model if self.has_llm else "fallback",
                     "timestamp": end_time.isoformat()
                 }
             }
@@ -144,13 +137,16 @@ class BaseAIAgent(ABC):
     
     def _init_vertex_ai(self) -> bool:
         """
-        Initialize GCP Vertex AI with service account.
+        Initialize GCP Vertex AI with Gemini using Application Default Credentials.
         
         Environment variables:
-            GCP_PROJECT_ID: GCP project ID
+            GCP_PROJECT_ID: GCP project ID (REQUIRED)
             GCP_REGION: GCP region (default: us-central1)
-            GCP_SERVICE_ACCOUNT_JSON: Path to service account JSON file
-            GOOGLE_APPLICATION_CREDENTIALS: Alternative path to service account JSON
+            
+        Credentials: Uses Application Default Credentials from:
+            - gcloud auth login (for local development)
+            - Service account in production
+            - GOOGLE_APPLICATION_CREDENTIALS env var
             
         Returns:
             True if successfully initialized
@@ -160,41 +156,28 @@ class BaseAIAgent(ABC):
             region = os.getenv("GCP_REGION", "us-central1")
             
             if not project_id:
+                self.logger.warning("GCP_PROJECT_ID not set. Please set it to use Gemini.")
                 return False
             
-            # Load service account credentials
-            sa_json_path = os.getenv("GCP_SERVICE_ACCOUNT_JSON") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            # Initialize Vertex AI - uses Application Default Credentials automatically
+            vertexai.init(project=project_id, location=region)
+            self.logger.info(f"Initialized Vertex AI: project={project_id}, region={region}")
             
-            if sa_json_path and os.path.exists(sa_json_path):
-                credentials = service_account.Credentials.from_service_account_file(
-                    sa_json_path,
-                    scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            # Initialize Gemini model
+            self.gemini_model = GenerativeModel(
+                model_name=self.model,
+                generation_config=GenerationConfig(
+                    max_output_tokens=self.max_tokens,
+                    temperature=self.temperature,
                 )
-                self.logger.info(f"Loaded service account from {sa_json_path}")
-            else:
-                # Use default credentials (if running on GCP)
-                credentials, _ = default()
-                self.logger.info("Using default GCP credentials")
-            
-            # Initialize Vertex AI Anthropic client
-            self.claude_client = AnthropicVertex(
-                project_id=project_id,
-                region=region,
-                credentials=credentials
             )
             
-            # Map model names for Vertex AI
-            if "claude-sonnet-4" in self.model or "sonnet-4" in self.model:
-                self.model = "claude-3-5-sonnet-v2@20241022"
-            elif "opus" in self.model:
-                self.model = "claude-3-opus@20240229"
-            elif "haiku" in self.model:
-                self.model = "claude-3-5-haiku@20241022"
-            
+            self.logger.info(f"Initialized Gemini model: {self.model}")
             return True
             
         except Exception as e:
-            self.logger.debug(f"Vertex AI initialization failed: {e}")
+            self.logger.warning(f"Vertex AI initialization failed: {e}")
+            self.logger.info("Make sure you've run: gcloud auth login")
             return False
     
     def _validate_input(self, input_data: Dict[str, Any]) -> None:
@@ -212,14 +195,14 @@ class BaseAIAgent(ABC):
         if not input_data:
             raise ValueError("Input data is required")
     
-    async def call_claude(
+    async def call_gemini(
         self,
         system_prompt: str,
         user_prompt: str,
         **kwargs
     ) -> str:
         """
-        Call Claude API with prompt.
+        Call Gemini API with prompt.
         
         Args:
             system_prompt: System instructions
@@ -227,38 +210,50 @@ class BaseAIAgent(ABC):
             **kwargs: Additional parameters
             
         Returns:
-            Claude's response text
+            Gemini's response text
         """
-        if not self.has_claude:
+        if not self.has_llm:
             # Use fallback mock response
-            self.logger.warning(f"{self.agent_name}: Using mock response (no API key)")
+            self.logger.warning(f"{self.agent_name}: Using mock response (Vertex AI not configured)")
             return self._generate_mock_response(user_prompt)
         
         try:
-            response = await self.claude_client.messages.create(
-                model=kwargs.get('model', self.model),
-                max_tokens=kwargs.get('max_tokens', self.max_tokens),
-                temperature=kwargs.get('temperature', self.temperature),
-                system=system_prompt,
-                messages=[
-                    {"role": "user", "content": user_prompt}
-                ]
+            # Combine system and user prompts for Gemini
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            
+            # Generate response
+            response = await self.gemini_model.generate_content_async(
+                full_prompt,
+                generation_config=GenerationConfig(
+                    max_output_tokens=kwargs.get('max_tokens', self.max_tokens),
+                    temperature=kwargs.get('temperature', self.temperature),
+                )
             )
             
             # Extract text response
-            text_content = response.content[0].text
+            text_content = response.text
             
-            self.logger.info(
-                f"{self.agent_name}: Claude call successful via {self.llm_provider} "
-                f"(input_tokens={response.usage.input_tokens}, "
-                f"output_tokens={response.usage.output_tokens})"
-            )
+            # Log usage (Gemini provides token counts in usage_metadata)
+            if hasattr(response, 'usage_metadata'):
+                input_tokens = response.usage_metadata.prompt_token_count
+                output_tokens = response.usage_metadata.candidates_token_count
+                self.logger.info(
+                    f"{self.agent_name}: Gemini call successful via {self.llm_provider} "
+                    f"(input_tokens={input_tokens}, output_tokens={output_tokens})"
+                )
+            else:
+                self.logger.info(f"{self.agent_name}: Gemini call successful via {self.llm_provider}")
             
             return text_content
             
         except Exception as e:
-            self.logger.error(f"{self.agent_name}: Claude API call failed: {e}")
+            self.logger.error(f"{self.agent_name}: Gemini API call failed: {e}")
             raise
+    
+    # Alias for backward compatibility
+    async def call_claude(self, system_prompt: str, user_prompt: str, **kwargs) -> str:
+        """Alias for call_gemini - for backward compatibility."""
+        return await self.call_gemini(system_prompt, user_prompt, **kwargs)
     
     async def call_llm(self, user_prompt: str, **kwargs) -> str:
         """
@@ -288,9 +283,12 @@ class BaseAIAgent(ABC):
             prompt: User prompt
             
         Returns:
-            Mock JSON response
+            Mock JSON response with fallback indicator
         """
         import json
+        
+        # Log warning about fallback
+        self.logger.warning(f"{self.agent_name}: ⚠️ Using fallback mock response - AI API unavailable")
         
         # Generate appropriate mock based on agent type
         if "identity" in self.agent_name.lower() or "verify" in prompt.lower():
@@ -307,18 +305,24 @@ class BaseAIAgent(ABC):
                 },
                 "issues": [],
                 "fraud_indicators": [],
-                "recommendation": "Identity verified with high confidence (mock response)."
+                "recommendation": "Identity verified with high confidence (FALLBACK: mock response used).",
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Result generated without AI - mock/fallback logic used"
             })
         
         elif "decision" in self.agent_name.lower():
             return json.dumps({
                 "decision": "APPROVE",
                 "confidence": 85,
-                "reasoning": "Strong credit profile, verified identity, no fraud indicators (mock response).",
+                "reasoning": "⚠️ FALLBACK DECISION: Strong credit profile, verified identity, no fraud indicators (AI API unavailable - using mock response).",
                 "key_factors": ["Good credit score", "Stable employment", "Clean rental history"],
                 "risk_mitigation": None,
                 "conditions": None,
-                "fair_housing_compliant": True
+                "fair_housing_compliant": True,
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Decision made without AI - mock/fallback logic used"
             })
         
         elif "fraud" in self.agent_name.lower():
@@ -327,7 +331,10 @@ class BaseAIAgent(ABC):
                 "fraud_score": 0.15,
                 "fraud_indicators": [],
                 "synthetic_identity_probability": 0.05,
-                "recommendation": "No significant fraud indicators detected (mock response)."
+                "recommendation": "No significant fraud indicators detected (FALLBACK: mock response used).",
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Result generated without AI - mock/fallback logic used"
             })
         
         elif "compliance" in self.agent_name.lower():
@@ -340,7 +347,10 @@ class BaseAIAgent(ABC):
                 "risk_level": "LOW",
                 "required_actions": [],
                 "adverse_action_required": False,
-                "recommendation": "All compliance checks passed (mock response)."
+                "recommendation": "All compliance checks passed (FALLBACK: mock response used).",
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Result generated without AI - mock/fallback logic used"
             })
         
         elif "bias" in self.agent_name.lower():
@@ -352,24 +362,30 @@ class BaseAIAgent(ABC):
                 "bias_type": "NONE",
                 "risk_level": "LOW",
                 "mitigation_strategies": [],
-                "recommendation": "No bias detected in decision factors (mock response)."
+                "recommendation": "No bias detected in decision factors (FALLBACK: mock response used).",
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Result generated without AI - mock/fallback logic used"
             })
         
         else:
             return json.dumps({
                 "status": "success",
-                "result": "Mock response - Claude API not configured",
-                "confidence": 0.5
+                "result": "Mock response - Gemini API not configured",
+                "confidence": 0.5,
+                "ai_used": False,
+                "fallback_mode": "mock",
+                "warning": "Result generated without AI - mock/fallback logic used"
             })
     
-    async def call_claude_with_json_response(
+    async def call_gemini_with_json_response(
         self,
         system_prompt: str,
         user_prompt: str,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Call Claude and parse JSON response.
+        Call Gemini and parse JSON response.
         
         Args:
             system_prompt: System instructions
@@ -384,7 +400,7 @@ class BaseAIAgent(ABC):
         # Add JSON instruction to system prompt
         system_prompt += "\n\nYou must respond with valid JSON only. No other text."
         
-        response_text = await self.call_claude(system_prompt, user_prompt, **kwargs)
+        response_text = await self.call_gemini(system_prompt, user_prompt, **kwargs)
         
         # Try to extract JSON from response
         try:
@@ -398,9 +414,14 @@ class BaseAIAgent(ABC):
             else:
                 return json.loads(response_text)
         except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse JSON from Claude response: {e}")
+            self.logger.error(f"Failed to parse JSON from Gemini response: {e}")
             self.logger.debug(f"Response text: {response_text}")
-            raise ValueError(f"Claude response is not valid JSON: {e}")
+            raise ValueError(f"Gemini response is not valid JSON: {e}")
+    
+    # Alias for backward compatibility
+    async def call_claude_with_json_response(self, system_prompt: str, user_prompt: str, **kwargs) -> Dict[str, Any]:
+        """Alias for call_gemini_with_json_response - for backward compatibility."""
+        return await self.call_gemini_with_json_response(system_prompt, user_prompt, **kwargs)
     
     def _create_success_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create standardized success response."""

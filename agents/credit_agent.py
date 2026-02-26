@@ -22,7 +22,7 @@ class CreditAgent(BaseAIAgent):
     def __init__(self):
         super().__init__(
             agent_name="CreditAgent",
-            model="claude-sonnet-4.5-20250514",  # Not used for mock
+            model="gemini-2.5-flash",  # Not used for mock
             max_tokens=1000,
             temperature=0.0
         )

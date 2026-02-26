@@ -24,7 +24,7 @@ class IngestionAIAgent(BaseAIAgent):
     def __init__(self):
         super().__init__(
             agent_name="IngestionAIAgent",
-            model="claude-sonnet-4.5-20250514",
+            model="gemini-2.5-flash",
             max_tokens=4000,
             temperature=0.3  # Lower temperature for structured extraction
         )
