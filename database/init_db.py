@@ -395,8 +395,8 @@ def init_database(mode=None):
                     _dk = hashlib.pbkdf2_hmac("sha256", b"Test@123", _salt, 100_000)
                     _pw_hash = _salt.hex() + ":" + _dk.hex()
                     cursor.execute(
-                        "INSERT INTO users (user_id, first_name, email, password_hash) VALUES (%s, %s, %s, %s)",
-                        (DUMMY_USER_ID, "Demo", "demo@equifax.com", _pw_hash)
+                        "INSERT INTO users (user_id, first_name, last_name, email, password_hash) VALUES (%s, %s, %s, %s, %s)",
+                        (DUMMY_USER_ID, "Demo", "User", "demo@equifax.com", _pw_hash)
                     )
                     connection.commit()
                     print("✓ Created dummy user (demo@equifax.com / Test@123)")

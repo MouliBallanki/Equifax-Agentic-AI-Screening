@@ -73,6 +73,12 @@
             </div>
 
             <div class="form-group">
+                <label>Last Name <span class="req">*</span></label>
+                <input type="text" id="last_name" placeholder="Doe" required>
+                <div class="error-msg">Last name is required</div>
+            </div>
+
+            <div class="form-group">
                 <label>Email Address <span class="req">*</span></label>
                 <input type="email" id="email" placeholder="john@email.com" required>
                 <div class="error-msg">Valid email is required</div>
@@ -112,12 +118,14 @@
         alertEl.style.display = 'none';
 
         const first_name = document.getElementById('first_name').value.trim();
+        const last_name = document.getElementById('last_name').value.trim();
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
         const confirm_password = document.getElementById('confirm_password').value;
 
         let valid = true;
         if (!first_name) { document.getElementById('first_name').classList.add('error'); valid = false; }
+        if (!last_name)  { document.getElementById('last_name').classList.add('error'); valid = false; }
         if (!email)      { document.getElementById('email').classList.add('error'); valid = false; }
         if (password.length < 6) { document.getElementById('password').classList.add('error'); valid = false; }
         if (password !== confirm_password) { document.getElementById('confirm_password').classList.add('error'); valid = false; }
@@ -130,7 +138,7 @@
             const res = await fetch('/api/v1/auth/signup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ first_name, email, password, confirm_password })
+                body: JSON.stringify({ first_name, last_name, email, password, confirm_password })
             });
             const data = await res.json();
 

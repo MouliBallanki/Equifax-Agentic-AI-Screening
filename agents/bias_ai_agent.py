@@ -23,7 +23,7 @@ class BiasAIAgent(BaseAIAgent):
         """Initialize BiasAIAgent."""
         super().__init__(
             agent_name="BiasAIAgent",
-            model="claude-sonnet-4.5-20250514",
+            model="gemini-2.5-flash",
             max_tokens=2500,
             temperature=0.2
         )

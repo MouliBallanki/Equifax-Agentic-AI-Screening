@@ -119,14 +119,15 @@ class ApplicationProcessor:
         """Continuously monitor and process applications."""
         logger.info("📡 Starting continuous monitoring...")
         logger.info(f"💡 Checking for pending applications every {self.poll_interval} seconds")
-        logger.info("💡 Press Ctrl+C to stop\n")
+        logger.info("💡 Press Ctrl+C to stop")
+        logger.info("💡 Logs will only show when processing applications\n")
         
         consecutive_empty = 0
         
         while self.running:
             try:
-                # Check for pending applications
-                pending_count = await self._get_pending_count()
+                # Check for pending applications (quietly)
+                pending_count = await self._get_pending_count(quiet=(consecutive_empty > 0))
                 
                 if pending_count > 0:
                     consecutive_empty = 0
@@ -139,9 +140,9 @@ class ApplicationProcessor:
                     consecutive_empty += 1
                     if consecutive_empty == 1:
                         logger.info(f"\n✅ No pending applications found")
-                        logger.info(f"⏳ Waiting for new applications...")
-                    elif consecutive_empty % 6 == 0:  # Every minute if poll_interval=10
-                        logger.info(f"⏳ Still waiting... (checked {consecutive_empty} times)")
+                        logger.info(f"⏳ Monitoring for new applications... (quiet mode)")
+                    elif consecutive_empty % 30 == 0:  # Every 5 minutes if poll_interval=10
+                        logger.info(f"⏳ Still monitoring... ({consecutive_empty * self.poll_interval // 60} minutes idle)")
                 
                 # Wait before next check
                 await asyncio.sleep(self.poll_interval)
@@ -162,10 +163,21 @@ class ApplicationProcessor:
         else:
             logger.info("No pending applications to process")
     
-    async def _get_pending_count(self) -> int:
-        """Get count of pending applications."""
+    async def _get_pending_count(self, quiet: bool = False) -> int:
+        """Get count of pending applications.
+        
+        Args:
+            quiet: If True, don't log stats (used during idle monitoring)
+        """
         stats = await self.db_tool.get_application_statistics()
-        return stats.get('screening_pending', 0)
+        pending_count = stats.get('screening_pending', 0)
+        
+        # Only log when not in quiet mode or when there are pending apps
+        if not quiet or pending_count > 0:
+            logger.info(f"📊 Database stats: {stats}")
+            logger.info(f"📊 Pending count: {pending_count}")
+        
+        return pending_count
     
     async def _process_batch(self):
         """Process a batch of pending applications."""
@@ -176,9 +188,18 @@ class ApplicationProcessor:
             pending_apps = await self.db_tool.get_pending_applications(limit=self.batch_size)
             
             if not pending_apps:
+                logger.warning("⚠️  No pending applications returned by query despite count > 0")
+                logger.warning("   This might indicate a filtering issue. Checking database...")
+                # Double-check what's in the database
+                stats = await self.db_tool.get_application_statistics()
+                logger.warning(f"   Statistics: {stats}")
                 return
             
             logger.info(f"📦 Processing {len(pending_apps)} applications...")
+            
+            # Track batch-specific stats
+            batch_successful = 0
+            batch_failed = 0
             
             # Process each application
             for i, app in enumerate(pending_apps, 1):
@@ -190,10 +211,12 @@ class ApplicationProcessor:
                 try:
                     await self._process_application(app)
                     self.stats["successful"] += 1
+                    batch_successful += 1
                     logger.info(f"      ✅ Completed successfully")
                     
                 except Exception as e:
                     self.stats["failed"] += 1
+                    batch_failed += 1
                     logger.error(f"      ❌ Failed: {e}")
                     
                     # Mark as error in database
@@ -206,7 +229,7 @@ class ApplicationProcessor:
                 
                 self.stats["total_processed"] += 1
             
-            logger.info(f"\n✅ Batch completed: {self.stats['successful']}/{len(pending_apps)} successful")
+            logger.info(f"\n✅ Batch completed: {batch_successful}/{len(pending_apps)} successful (Total: {self.stats['successful']} successful, {self.stats['failed']} failed)")
             
         except Exception as e:
             logger.error(f"❌ Batch processing error: {e}", exc_info=True)
@@ -243,6 +266,17 @@ class ApplicationProcessor:
         # Extract final decision
         final_decision = result.get('final_decision', {})
         agent_decision = final_decision.get('decision', 'PENDING')
+        
+        # Check if AI was used or fallback logic
+        ai_used = final_decision.get('ai_used', True)
+        fallback_mode = final_decision.get('fallback_mode')
+        warning_msg = final_decision.get('warning')
+        
+        if not ai_used:
+            logger.warning(f"      ⚠️  FALLBACK DECISION DETECTED!")
+            logger.warning(f"      ⚠️  Mode: {fallback_mode}")
+            logger.warning(f"      ⚠️  {warning_msg}")
+        
         # Convert AI decision (APPROVE/DENY/CONDITIONAL_APPROVE) to DB status (APPROVED/REJECTED/PENDING)
         status = decision_to_status(agent_decision)
         risk_score = final_decision.get('risk_score')
@@ -270,7 +304,7 @@ class ApplicationProcessor:
                     execution_time_ms=agent_result.get('metadata', {}).get('execution_time_ms')
                 )
         
-        logger.info(f"      📊 Result: {status.upper()} (risk: {risk_score:.2f})" if risk_score else f"      📊 Result: {status.upper()}")
+        logger.info(f"      📊 Result: {status.upper()} (risk: {risk_score:.2f}){' [FALLBACK]' if not ai_used else ''}" if risk_score else f"      📊 Result: {status.upper()}{' [FALLBACK]' if not ai_used else ''}")
     
     def _build_application_data(self, app: dict) -> dict:
         """Build application data from database fields."""

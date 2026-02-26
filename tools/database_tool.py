@@ -41,7 +41,7 @@ class DatabaseTool:
             'password': unquote(parsed.password) if parsed.password else '',
             'db': parsed.path.lstrip('/') if parsed.path else 'equifax_screening',
             'charset': 'utf8mb4',
-            'autocommit': False
+            'autocommit': True
         }
     
     async def connect(self):
@@ -355,3 +355,24 @@ class DatabaseTool:
             "screening_pending": completion_stats['pending'] or 0,
             "average_risk_score": float(avg_risk['avg_risk_score']) if avg_risk['avg_risk_score'] else 0.0
         }
+    
+    async def get_all_applications_debug(self) -> List[Dict[str, Any]]:
+        """Get all applications with minimal info for debugging."""
+        if not self.pool:
+            await self.connect()
+        
+        query = """
+            SELECT 
+                application_id, first_name, last_name, status, 
+                screening_completed, created_at
+            FROM applications
+            ORDER BY created_at DESC
+            LIMIT 50
+        """
+        
+        async with self.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(query)
+                results = await cursor.fetchall()
+        
+        return results

@@ -23,7 +23,7 @@ class ComplianceAIAgent(BaseAIAgent):
         """Initialize ComplianceAIAgent."""
         super().__init__(
             agent_name="ComplianceAIAgent",
-            model="claude-sonnet-4.5-20250514",
+            model="gemini-2.5-flash",
             max_tokens=3000,
             temperature=0.1  # Very low temperature for compliance accuracy
         )

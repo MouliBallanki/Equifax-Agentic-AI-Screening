@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Equifax AI Tenant Screening Platform",
-    description="MCP-based AI agent system for tenant screening with Claude Sonnet 4.5",
+    description="MCP-based AI agent system for tenant screening with Google Gemini 2.5 Flash",
     version="2.0.0",
     lifespan=lifespan
 )

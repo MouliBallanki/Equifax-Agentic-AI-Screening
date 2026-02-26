@@ -66,6 +66,7 @@ def _get_db_url() -> str:
 
 class SignupRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
     email: str = Field(..., min_length=5, max_length=255)
     password: str = Field(..., min_length=6)
     confirm_password: str
@@ -99,8 +100,8 @@ async def signup(req: SignupRequest) -> Dict[str, Any]:
                 password_hash = _hash_password(req.password)
 
                 await cursor.execute(
-                    "INSERT INTO users (user_id, first_name, email, password_hash) VALUES (%s, %s, %s, %s)",
-                    (user_id, req.first_name, req.email, password_hash),
+                    "INSERT INTO users (user_id, first_name, last_name, email, password_hash) VALUES (%s, %s, %s, %s, %s)",
+                    (user_id, req.first_name, req.last_name, req.email, password_hash),
                 )
                 await conn.commit()
 
@@ -121,7 +122,7 @@ async def login(req: LoginRequest) -> Dict[str, Any]:
             import aiomysql
             async with conn.cursor(aiomysql.DictCursor) as cursor:
                 await cursor.execute(
-                    "SELECT user_id, first_name, email, password_hash FROM users WHERE email = %s",
+                    "SELECT user_id, first_name, last_name, email, password_hash FROM users WHERE email = %s",
                     (req.email,),
                 )
                 user = await cursor.fetchone()
@@ -135,6 +136,7 @@ async def login(req: LoginRequest) -> Dict[str, Any]:
             "token": token,
             "user_id": user["user_id"],
             "first_name": user["first_name"],
+            "last_name": user["last_name"],
             "email": user["email"],
         }
     finally:
@@ -147,9 +149,30 @@ async def get_me(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     payload = decode_token(authorization[7:])
-
-    return {
-        "user_id": payload["sub"],
-        "first_name": payload["first_name"],
-        "email": payload["email"],
-    }
+    user_id = payload["sub"]
+    
+    # Fetch fresh data from database to include last_name
+    from tools.database_tool import DatabaseTool
+    db_tool = DatabaseTool(_get_db_url())
+    try:
+        await db_tool.connect()
+        async with db_tool.pool.acquire() as conn:
+            import aiomysql
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    "SELECT user_id, first_name, last_name, email FROM users WHERE user_id = %s",
+                    (user_id,),
+                )
+                user = await cursor.fetchone()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "user_id": user["user_id"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
+            "email": user["email"],
+        }
+    finally:
+        await db_tool.disconnect()

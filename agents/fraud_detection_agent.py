@@ -23,7 +23,7 @@ class FraudDetectionAgent(BaseAIAgent):
     def __init__(self):
         super().__init__(
             agent_name="FraudDetectionAgent",
-            model="claude-sonnet-4.5-20250514",
+            model="gemini-2.5-flash",
             max_tokens=2000,
             temperature=0.3
         )

@@ -16,6 +16,56 @@ fake = Faker()
 BASE_URL = "http://localhost:8000/api/v1"
 
 
+def signup_or_login(first_name, last_name, email):
+    """Sign up or login to get JWT token."""
+    password = "TestPassword123!"  # Test password
+    
+    # Try login first
+    try:
+        response = requests.post(
+            f"{BASE_URL}/auth/login",
+            json={"email": email, "password": password},
+            timeout=10
+        )
+        if response.status_code == 200:
+            result = response.json()
+            print(f"✅ Logged in as: {email}")
+            return result['token']
+    except:
+        pass
+    
+    # If login fails, sign up
+    try:
+        response = requests.post(
+            f"{BASE_URL}/auth/signup",
+            json={
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "password": password,
+                "confirm_password": password
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            print(f"✅ Created new account: {email}")
+            # Now login to get token
+            login_response = requests.post(
+                f"{BASE_URL}/auth/login",
+                json={"email": email, "password": password},
+                timeout=10
+            )
+            login_response.raise_for_status()
+            return login_response.json()['token']
+        else:
+            print(f"❌ Signup failed: {response.text}")
+            return None
+    except Exception as e:
+        print(f"❌ Authentication error: {e}")
+        return None
+
+
 def generate_test_applicant():
     """Generate a realistic test applicant."""
     first_name = fake.first_name()
@@ -77,10 +127,23 @@ def submit_application(applicant_data):
     print(f"Income: ${applicant_data['employment']['annual_income']:,.2f}/year")
     print(f"Current Rent: ${applicant_data['rental_history']['monthly_rent']:.2f}/month")
     
+    # Get authentication token
+    print("\n🔐 Authenticating...")
+    token = signup_or_login(
+        applicant['first_name'],
+        applicant['last_name'],
+        applicant['email']
+    )
+    
+    if not token:
+        print("\n❌ Failed to authenticate")
+        return None
+    
     try:
         response = requests.post(
             f"{BASE_URL}/applications/submit-to-db",
             json=applicant_data,
+            headers={"Authorization": f"Bearer {token}"},
             timeout=30
         )
         response.raise_for_status()
