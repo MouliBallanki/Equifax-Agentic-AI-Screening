@@ -33,7 +33,7 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    logger.info("Starting Equifax AI MCP Screening Server...")
+    logger.info("Starting AI Tenant Screening Server...")
     context_manager = ContextManager()
     orchestrator = AgentOrchestrator(context_manager)
     app.state.context_manager = context_manager
@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Equifax AI Tenant Screening Platform",
+    title="AI Tenant Screening Platform",
     description="MCP-based AI agent system for tenant screening with Google Gemini 2.5 Flash",
     version="2.0.0",
     lifespan=lifespan
@@ -88,7 +88,7 @@ async def apply_page():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "equifax-ai-mcp-screening"}
+    return {"status": "healthy", "service": "ai-tenant-screening"}
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """
 Credit Agent
 
-Mocked Equifax credit bureau integration.
+Mocked credit bureau integration.
 Returns realistic credit report data for tenant screening.
 """
 
@@ -13,9 +13,9 @@ from .base_ai_agent import BaseAIAgent
 
 class CreditAgent(BaseAIAgent):
     """
-    Mock credit bureau (Equifax) integration.
+    Mock credit bureau integration.
     
-    In production, this would connect to real Equifax API.
+    In production, this would connect to real credit bureau APIs.
     For demo, generates realistic mock credit reports.
     """
     
@@ -161,7 +161,7 @@ class CreditAgent(BaseAIAgent):
                 "judgments": 1 if derogatory_marks >= 2 and random.random() < 0.2 else 0
             },
             "report_date": datetime.utcnow().strftime("%Y-%m-%d"),
-            "bureau": "Equifax (MOCK)"
+            "bureau": "Credit Bureau (MOCK)"
         }
         
         # Reset random seed

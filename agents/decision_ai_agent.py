@@ -35,7 +35,7 @@ class DecisionAIAgent(BaseAIAgent):
         Returns:
             Specialized prompt for final decision synthesis
         """
-        return """You are an expert tenant screening decision agent for Equifax.
+        return """You are an expert tenant screening decision agent.
 
 Your role is to synthesize results from multiple AI agents and make a final approve/deny decision.
 

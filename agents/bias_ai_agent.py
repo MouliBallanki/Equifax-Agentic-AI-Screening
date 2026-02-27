@@ -35,7 +35,7 @@ class BiasAIAgent(BaseAIAgent):
         Returns:
             Specialized prompt for fairness analysis
         """
-        return """You are an AI fairness expert for Equifax, specializing in detecting algorithmic bias.
+        return """You are an AI fairness expert specializing in detecting algorithmic bias in tenant screening.
 
 Your role is to analyze tenant screening decisions for potential bias against protected classes.
 

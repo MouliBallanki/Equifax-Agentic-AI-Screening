@@ -35,7 +35,7 @@ class IdentityAIAgent(BaseAIAgent):
         Returns:
             Specialized prompt for identity analysis
         """
-        return """You are an expert identity verification agent for Equifax.
+        return """You are an expert identity verification agent.
 
 Your role is to analyze applicant identity information and detect potential fraud or inconsistencies.
 

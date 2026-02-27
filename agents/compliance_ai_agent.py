@@ -35,7 +35,7 @@ class ComplianceAIAgent(BaseAIAgent):
         Returns:
             Specialized prompt for regulatory compliance
         """
-        return """You are an expert compliance agent for Equifax, specializing in tenant screening regulations.
+        return """You are an expert compliance agent specializing in tenant screening regulations.
 
 Your role is to ensure all screening decisions comply with federal and state laws.
 
